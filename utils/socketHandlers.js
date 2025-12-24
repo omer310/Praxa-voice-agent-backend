@@ -6,8 +6,7 @@ const logger = require('../utils/logger');
  * @param {Server} io - Socket.io server instance
  */
 function initializeSocketHandlers(io) {
-  // Override default connection handler with enhanced event handlers
-  io.off('connection'); // Remove default handler
+  // Register connection handler for new clients
   io.on('connection', (socket) => {
     const userId = socket.user.userId;
     const sessionId = socket.sessionId;
