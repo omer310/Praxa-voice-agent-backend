@@ -43,10 +43,13 @@ function initializeSocketHandlers(io) {
 
         // Register event handlers for this socket
         voiceController.registerEventHandlers(sessionId, {
+          onSettingsApplied: (data) => {
+            socket.emit('settings_applied', data);
+          },
           onTranscript: (data) => {
             socket.emit('transcript', data);
           },
-          onAudioResponse: (audioBuffer) => {
+          onAgentAudio: (audioBuffer) => {
             // Send binary audio data
             socket.emit('audio_response', audioBuffer);
           },

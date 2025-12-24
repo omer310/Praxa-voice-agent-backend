@@ -64,6 +64,12 @@ class VoiceController {
       }
 
       const eventHandlers = {
+        onSettingsApplied: (data) => {
+          logger.debug('Settings applied', { sessionId });
+          if (sessionData.onSettingsApplied) {
+            sessionData.onSettingsApplied(data);
+          }
+        },
         onTranscript: (data) => {
           sessionData.transcripts.push({
             timestamp: new Date(),
@@ -74,10 +80,10 @@ class VoiceController {
             sessionData.onTranscript(data);
           }
         },
-        onAudioResponse: (audioBuffer) => {
+        onAgentAudio: (audioBuffer) => {
           // Emit audio to socket.io via the socket handler
-          if (sessionData.onAudioResponse) {
-            sessionData.onAudioResponse(audioBuffer);
+          if (sessionData.onAgentAudio) {
+            sessionData.onAgentAudio(audioBuffer);
           }
         },
         onError: (error) => {
@@ -131,8 +137,9 @@ class VoiceController {
   registerEventHandlers(sessionId, handlers) {
     const sessionData = this.activeSessions.get(sessionId);
     if (sessionData) {
+      sessionData.onSettingsApplied = handlers.onSettingsApplied;
       sessionData.onTranscript = handlers.onTranscript;
-      sessionData.onAudioResponse = handlers.onAudioResponse;
+      sessionData.onAgentAudio = handlers.onAgentAudio;
       sessionData.onError = handlers.onError;
       sessionData.onClose = handlers.onClose;
     }
