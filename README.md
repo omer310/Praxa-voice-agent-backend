@@ -1,4 +1,4 @@
-# Praxis Voice Agent Backend
+# Praxa Voice Agent Backend
 
 A real-time voice agent backend service that facilitates communication between the Expo app and Deepgram's Voice Agent API, integrated with OpenAI for conversational responses.
 
