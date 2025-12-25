@@ -187,7 +187,8 @@ class DeepgramService {
             speak: {
               provider: {
                 type: 'deepgram',
-                model: config.deepgramVoiceModel || 'aura-zeus-en'
+                // FORCE aura-zeus-en - ignore config.deepgramVoiceModel which was sending invalid 'aura-2-en-neural'
+                model: 'aura-zeus-en'
               }
             }
           }
