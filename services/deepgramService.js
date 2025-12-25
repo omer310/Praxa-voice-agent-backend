@@ -230,11 +230,11 @@ class DeepgramService {
         this.eventHandlers.set(sessionId, eventHandlers);
         this.agentConnections.set(sessionId, connection);
 
-        // IMPORTANT: Set up event handlers BEFORE configuring to avoid missing events
-        // Handle Open event
+        // IMPORTANT: Set up event handlers BEFORE connection opens to avoid missing events
+        // Handle Open event - THIS IS WHERE WE CONFIGURE (not before!)
         connection.on(AgentEvents.Open, () => {
           clearTimeout(connectionTimeout); // Clear timeout on successful connection
-          logger.info('✅ Connected to Deepgram Voice Agent API', { sessionId });
+          logger.info('✅ Deepgram WebSocket OPEN - NOW sending Settings...', { sessionId });
           
           // Set up keep-alive every 5 seconds
           const keepAliveInterval = setInterval(() => {
@@ -250,6 +250,40 @@ class DeepgramService {
           this.keepAliveIntervals = this.keepAliveIntervals || new Map();
           this.keepAliveIntervals.set(sessionId, keepAliveInterval);
           
+          // *** CRITICAL FIX: Configure AFTER WebSocket is open! ***
+          // The SDK has a bug where sendBuffer is never flushed after connection opens.
+          // So we MUST call configure() only after Open event fires.
+          logger.info('⚙️ Sending Settings to Deepgram (WebSocket is now open)...', { 
+            sessionId,
+            configSummary: {
+              model: agentConfig.model,
+              language: agentConfig.language,
+              listenModel: agentConfig.listen.model,
+              llmType: agentConfig.think.provider.type,
+              llmModel: agentConfig.think.provider.model,
+              hasLLMKey: !!agentConfig.think.provider.api_key,
+              speakModel: agentConfig.speak.model,
+              hasGreeting: !!agentConfig.greeting,
+              eotTimeout: agentConfig.eot_timeout_ms
+            }
+          });
+          
+          try {
+            connection.configure(agentConfig);
+            logger.info('✅ Settings sent successfully, waiting for SettingsApplied...', { sessionId });
+          } catch (configError) {
+            logger.error('❌ CRITICAL: Failed to send Settings', {
+              sessionId,
+              error: configError.message,
+              stack: configError.stack
+            });
+            // Notify error handler
+            eventHandlers.onError?.({ 
+              message: 'Failed to configure Voice Agent', 
+              error: configError.message 
+            });
+          }
+          
           // Notify that connection is fully open and ready
           eventHandlers.onOpen?.();
           
@@ -260,7 +294,7 @@ class DeepgramService {
         // Voice Agent sends this after valid settings are received
         connection.on(AgentEvents.SettingsApplied, (data) => {
           try {
-            logger.debug('Settings applied', { sessionId, data });
+            logger.info('✅ SETTINGS APPLIED - Deepgram Voice Agent is fully ready!', { sessionId, data });
             eventHandlers.onSettingsApplied?.({
               message: 'Voice Agent settings configured successfully'
             });
@@ -449,45 +483,9 @@ class DeepgramService {
           logger.debug('AgentThinking event not available', { sessionId });
         }
 
-        // NOW configure the agent after all event handlers are set up
-        // This triggers the WebSocket connection and sends the Settings message
-        logger.info('⚙️ Configuring agent and initiating connection...', { 
-          sessionId,
-          configSummary: {
-            model: agentConfig.model,
-            language: agentConfig.language,
-            listenModel: agentConfig.listen.model,
-            llmType: agentConfig.think.provider.type,
-            llmModel: agentConfig.think.provider.model,
-            hasLLMKey: !!agentConfig.think.provider.api_key,
-            speakModel: agentConfig.speak.model,
-            hasGreeting: !!agentConfig.greeting,
-            eotTimeout: agentConfig.eot_timeout_ms
-          }
-        });
-        
-        try {
-          connection.configure(agentConfig);
-          logger.info('✅ Agent configuration sent successfully, waiting for connection...', { sessionId });
-          
-          // Log WebSocket state after configure
-          setTimeout(() => {
-            logger.info('🔍 WebSocket state check (2s after configure)', {
-              sessionId,
-              wsReadyState: connection?.ws?.readyState,
-              wsReadyStateText: ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][connection?.ws?.readyState] || 'UNKNOWN',
-              wsUrl: connection?.ws?.url,
-              hasConnection: !!connection
-            });
-          }, 2000);
-        } catch (configError) {
-          logger.error('❌ CRITICAL: Failed to call connection.configure()', {
-            sessionId,
-            error: configError.message,
-            stack: configError.stack
-          });
-          throw configError;
-        }
+        // Note: configure() is now called INSIDE the Open event handler above
+        // This fixes the SDK bug where sendBuffer is never flushed after connection opens
+        logger.info('⏳ Waiting for WebSocket to open before sending Settings...', { sessionId });
 
       } catch (error) {
         clearTimeout(connectionTimeout); // Clear timeout on error
