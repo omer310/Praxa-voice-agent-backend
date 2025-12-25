@@ -156,48 +156,47 @@ class DeepgramService {
       try {
         logger.info('🚀 Connecting to Deepgram Voice Agent API', { sessionId });
 
-        // Configure Voice Agent according to Deepgram Voice Agent API spec
-        // Structure: { agent: { listen, think, speak, greeting } }
-        // See: https://developers.deepgram.com/docs/voice-agent-settings
+        // Configure Voice Agent according to Deepgram JS SDK examples
+        // Structure based on SDK v4.11.3 agent examples
         const agentConfig = {
+          audio: {
+            input: {
+              encoding: 'linear16',
+              sample_rate: 16000
+            },
+            output: {
+              encoding: 'linear16',
+              sample_rate: 16000,
+              container: 'none'
+            }
+          },
           agent: {
             listen: {
-              provider: {
-                type: 'deepgram',
-                model: config.deepgramListenModel || 'nova-3'
-              }
+              model: config.deepgramListenModel || 'nova-2'
             },
             think: {
               provider: {
-                type: config.deepgramLLMProvider || 'open_ai',
-                model: config.deepgramLLMModel || 'gpt-4o-mini'
+                type: config.deepgramLLMProvider || 'open_ai'
               },
-              // System prompt for the LLM
-              prompt: config.deepgramSystemPrompt || 'You are a helpful voice assistant. Keep responses concise and natural for voice conversation.'
+              model: config.deepgramLLMModel || 'gpt-4o-mini',
+              instructions: config.deepgramSystemPrompt || 'You are a helpful voice assistant. Keep responses concise and natural for voice conversation.'
             },
             speak: {
-              provider: {
-                type: 'deepgram',
-                model: config.deepgramVoiceModel || 'aura-asteria-en'
-              }
-            },
-            // Greeting message spoken when conversation starts
-            greeting: config.deepgramGreeting || 'Hello! How can I help you today?'
+              model: config.deepgramVoiceModel || 'aura-asteria-en'
+            }
           }
         };
 
         logger.info('📋 Agent config prepared', { 
           sessionId,
-          listenProvider: agentConfig.agent.listen.provider.type,
-          listenModel: agentConfig.agent.listen.provider.model,
+          audioInput: agentConfig.audio.input,
+          audioOutput: agentConfig.audio.output,
+          listenModel: agentConfig.agent.listen.model,
           thinkProvider: agentConfig.agent.think.provider.type,
-          thinkModel: agentConfig.agent.think.provider.model,
-          speakProvider: agentConfig.agent.speak.provider.type,
-          speakModel: agentConfig.agent.speak.provider.model,
-          hasPrompt: !!agentConfig.agent.think.prompt,
-          promptLength: agentConfig.agent.think.prompt?.length || 0,
-          hasGreeting: !!agentConfig.agent.greeting,
-          greetingLength: agentConfig.agent.greeting?.length || 0
+          thinkModel: agentConfig.agent.think.model,
+          speakModel: agentConfig.agent.speak.model,
+          hasInstructions: !!agentConfig.agent.think.instructions,
+          instructionsLength: agentConfig.agent.think.instructions?.length || 0
         });
         
         // Validate API keys before attempting connection
@@ -258,13 +257,10 @@ class DeepgramService {
           logger.info('⚙️ Sending Settings to Deepgram (WebSocket is now open)...', { 
             sessionId,
             configSummary: {
-              listenProvider: agentConfig.agent.listen.provider.type,
-              listenModel: agentConfig.agent.listen.provider.model,
+              listenModel: agentConfig.agent.listen.model,
               thinkProvider: agentConfig.agent.think.provider.type,
-              thinkModel: agentConfig.agent.think.provider.model,
-              speakProvider: agentConfig.agent.speak.provider.type,
-              speakModel: agentConfig.agent.speak.provider.model,
-              hasGreeting: !!agentConfig.agent.greeting
+              thinkModel: agentConfig.agent.think.model,
+              speakModel: agentConfig.agent.speak.model
             }
           });
           
