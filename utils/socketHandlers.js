@@ -58,12 +58,8 @@ function initializeSocketHandlers(io) {
           userId 
         });
 
-        // Initialize Deepgram connection
-        logger.info('🔗 Attempting to connect to Deepgram Voice Agent...', { sessionId });
-        await voiceController.initializeDeepgramConnection(sessionId);
-        logger.info('✅ Deepgram connection established successfully', { sessionId });
-
-        // Register event handlers for this socket
+        // Register event handlers for this socket BEFORE connecting
+        // This ensures they're in place when Deepgram's Open event fires
         voiceController.registerEventHandlers(sessionId, {
           onOpen: () => {
             // Emit voice_initialized ONLY after Deepgram connection is fully open
@@ -124,8 +120,14 @@ function initializeSocketHandlers(io) {
           }
         });
 
-        // voice_initialized is now emitted in the onOpen handler above
-        // to ensure proper timing after WebSocket connection is fully established
+        // Initialize Deepgram connection AFTER registering handlers
+        // This ensures onOpen handler is in place when Deepgram's Open event fires
+        logger.info('🔗 Attempting to connect to Deepgram Voice Agent...', { sessionId });
+        await voiceController.initializeDeepgramConnection(sessionId);
+        logger.info('✅ Deepgram connection established successfully', { sessionId });
+        
+        // voice_initialized will be emitted by the onOpen handler above
+        // after WebSocket connection is fully established
       } catch (error) {
         logger.error('❌ CRITICAL: Failed to initialize voice session', {
           socketId: socket.id,
