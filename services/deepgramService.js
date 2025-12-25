@@ -555,7 +555,7 @@ class DeepgramService {
 
   /**
    * Update agent configuration during conversation
-   * Documented in: /docs/voice-agent-update-prompt
+   * SDK v4 signature: updatePrompt(prompt: string): void
    * @param {string} sessionId - User session ID
    * @param {string} newPrompt - New system prompt
    */
@@ -568,19 +568,20 @@ class DeepgramService {
 
     try {
       if (typeof connection.updatePrompt === 'function') {
-        connection.updatePrompt({ instructions: newPrompt });
-        logger.info('Prompt updated', { sessionId, newPromptLength: newPrompt.length });
+        // SDK v4: Pass string directly, not an object
+        connection.updatePrompt(newPrompt);
+        logger.info('Prompt updated successfully', { sessionId, newPromptLength: newPrompt.length });
       } else {
         logger.warn('updatePrompt method not available on connection', { sessionId });
       }
     } catch (error) {
-      logger.error('Failed to update prompt', { sessionId, error: error.message });
+      logger.error('Failed to update prompt', { sessionId, error: error.message, stack: error.stack });
     }
   }
 
   /**
    * Update TTS voice during conversation
-   * Documented in: /docs/voice-agent-update-speak
+   * SDK v4 signature: updateSpeak(speakConfig: AgentLiveSchema["agent"]["speak"]): void
    * @param {string} sessionId - User session ID
    * @param {string} newVoice - New voice model (e.g., 'aura-asteria-en')
    */
@@ -593,13 +594,14 @@ class DeepgramService {
 
     try {
       if (typeof connection.updateSpeak === 'function') {
+        // SDK v4: Pass speak config object
         connection.updateSpeak({ model: newVoice });
-        logger.info('Voice/speak model updated', { sessionId, voice: newVoice });
+        logger.info('Voice/speak model updated successfully', { sessionId, voice: newVoice });
       } else {
         logger.warn('updateSpeak method not available on connection', { sessionId });
       }
     } catch (error) {
-      logger.error('Failed to update speak model', { sessionId, error: error.message });
+      logger.error('Failed to update speak model', { sessionId, error: error.message, stack: error.stack });
     }
   }
 
