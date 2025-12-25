@@ -220,10 +220,11 @@ class DeepgramService {
           throw new Error(`deepgramClient.agent is not a function. Type: ${typeof this.deepgramClient.agent}. Available methods: ${Object.keys(this.deepgramClient).join(', ')}`);
         }
         
-        // Pass the WebSocket endpoint as the first parameter (string)
-        const endpoint = 'wss://api.deepgram.com/v1/agent';
-        const connection = this.deepgramClient.agent(endpoint);
-        logger.info('✅ AgentLiveClient created', { sessionId, endpoint });
+        // Try WITHOUT passing endpoint - let SDK use its internal default
+        // SDK v4 might handle endpoint internally when none is provided
+        logger.info('🔌 Creating AgentLiveClient (no custom endpoint)...', { sessionId });
+        const connection = this.deepgramClient.agent();
+        logger.info('✅ AgentLiveClient created (using SDK defaults)', { sessionId });
 
         // Store handlers and connection
         this.eventHandlers.set(sessionId, eventHandlers);
