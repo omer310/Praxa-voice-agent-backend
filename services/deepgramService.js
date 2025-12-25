@@ -156,8 +156,8 @@ class DeepgramService {
       try {
         logger.info('🚀 Connecting to Deepgram Voice Agent API', { sessionId });
 
-        // Configure Voice Agent according to Deepgram JS SDK examples
-        // Structure based on SDK v4.11.3 agent examples
+        // Configure Voice Agent according to Deepgram Twilio integration docs
+        // This is the EXACT structure from the working Python example
         const agentConfig = {
           audio: {
             input: {
@@ -172,17 +172,23 @@ class DeepgramService {
           },
           agent: {
             listen: {
-              model: config.deepgramListenModel || 'nova-2'
+              provider: {
+                type: 'deepgram',
+                model: config.deepgramListenModel || 'nova-3'
+              }
             },
             think: {
               provider: {
-                type: config.deepgramLLMProvider || 'open_ai'
+                type: config.deepgramLLMProvider || 'open_ai',
+                model: config.deepgramLLMModel || 'gpt-4o-mini'
               },
-              model: config.deepgramLLMModel || 'gpt-4o-mini',
-              instructions: config.deepgramSystemPrompt || 'You are a helpful voice assistant. Keep responses concise and natural for voice conversation.'
+              prompt: config.deepgramSystemPrompt || 'You are a helpful voice assistant. Keep responses concise and natural for voice conversation.'
             },
             speak: {
-              model: config.deepgramVoiceModel || 'aura-asteria-en'
+              provider: {
+                type: 'deepgram',
+                model: config.deepgramVoiceModel || 'aura-2-thalia-en'
+              }
             }
           }
         };
@@ -191,12 +197,14 @@ class DeepgramService {
           sessionId,
           audioInput: agentConfig.audio.input,
           audioOutput: agentConfig.audio.output,
-          listenModel: agentConfig.agent.listen.model,
+          listenProvider: agentConfig.agent.listen.provider.type,
+          listenModel: agentConfig.agent.listen.provider.model,
           thinkProvider: agentConfig.agent.think.provider.type,
-          thinkModel: agentConfig.agent.think.model,
-          speakModel: agentConfig.agent.speak.model,
-          hasInstructions: !!agentConfig.agent.think.instructions,
-          instructionsLength: agentConfig.agent.think.instructions?.length || 0
+          thinkModel: agentConfig.agent.think.provider.model,
+          speakProvider: agentConfig.agent.speak.provider.type,
+          speakModel: agentConfig.agent.speak.provider.model,
+          hasPrompt: !!agentConfig.agent.think.prompt,
+          promptLength: agentConfig.agent.think.prompt?.length || 0
         });
         
         // Validate API keys before attempting connection
@@ -257,10 +265,12 @@ class DeepgramService {
           logger.info('⚙️ Sending Settings to Deepgram (WebSocket is now open)...', { 
             sessionId,
             configSummary: {
-              listenModel: agentConfig.agent.listen.model,
+              listenProvider: agentConfig.agent.listen.provider.type,
+              listenModel: agentConfig.agent.listen.provider.model,
               thinkProvider: agentConfig.agent.think.provider.type,
-              thinkModel: agentConfig.agent.think.model,
-              speakModel: agentConfig.agent.speak.model
+              thinkModel: agentConfig.agent.think.provider.model,
+              speakProvider: agentConfig.agent.speak.provider.type,
+              speakModel: agentConfig.agent.speak.provider.model
             }
           });
           
