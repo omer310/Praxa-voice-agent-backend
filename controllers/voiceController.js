@@ -171,6 +171,86 @@ class VoiceController {
   }
 
   /**
+   * Interrupt the agent mid-response
+   * Deepgram Voice Agent supports barge-in (user interrupting agent output)
+   * This method stops the current agent response, allowing user to speak
+   * 
+   * @param {string} sessionId - Session ID
+   */
+  interruptAgent(sessionId) {
+    try {
+      const sessionData = this.activeSessions.get(sessionId);
+      if (!sessionData) {
+        logger.warn('Session not found when interrupting', { sessionId });
+        return;
+      }
+
+      if (!sessionData.isConnectedToDeepgram) {
+        logger.warn('Cannot interrupt: Deepgram not connected', { sessionId });
+        return;
+      }
+
+      // Use the existing injectUserMessage to handle interruption
+      // This naturally resets the agent's state and makes it ready to listen
+      deepgramService.injectUserMessage(sessionId, '');
+
+      logger.info('Agent interrupted', { sessionId });
+    } catch (error) {
+      logger.error('Failed to interrupt agent', { sessionId, error: error.message });
+    }
+  }
+
+  /**
+   * Update the system prompt with user context
+   * Allows injecting user-specific data (tasks, calendar, preferences)
+   * into the LLM instructions for personalized responses
+   * 
+   * Use cases:
+   * - Personalize agent with user information
+   * - Inject tasks/calendar/email data
+   * - Customize agent behavior based on user preferences
+   * - Real-time context updates during conversation
+   * 
+   * @param {string} sessionId - Session ID
+   * @param {string} newPrompt - New system prompt with user context
+   */
+  updateSystemPrompt(sessionId, newPrompt) {
+    try {
+      const sessionData = this.activeSessions.get(sessionId);
+      if (!sessionData) {
+        logger.warn('Session not found when updating prompt', { sessionId });
+        return;
+      }
+
+      if (!sessionData.isConnectedToDeepgram) {
+        logger.warn('Cannot update prompt: Deepgram not connected', { sessionId });
+        return;
+      }
+
+      if (!newPrompt || typeof newPrompt !== 'string') {
+        logger.warn('Invalid prompt provided', { 
+          sessionId, 
+          promptType: typeof newPrompt 
+        });
+        return;
+      }
+
+      // Update Deepgram LLM system prompt (instructions)
+      deepgramService.updatePrompt(sessionId, newPrompt);
+
+      // Store in session for reference
+      sessionData.currentPrompt = newPrompt;
+
+      logger.info('System prompt updated with user context', { 
+        sessionId, 
+        promptLength: newPrompt.length 
+      });
+    } catch (error) {
+      logger.error('Failed to update system prompt', { sessionId, error: error.message });
+    }
+  }
+
+  /**
    * Get session data (for debugging/monitoring)
    * @param {string} sessionId - Session ID
    * @returns {Object|null} Session data or null if not found

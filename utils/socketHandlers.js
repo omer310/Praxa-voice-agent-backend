@@ -181,6 +181,101 @@ function initializeSocketHandlers(io) {
       }
     });
 
+    /**
+     * 'interrupt' event
+     * Client sends this to interrupt/stop the agent mid-response
+     * Allows user to speak over agent or pause conversation
+     * 
+     * Deepgram Voice Agent supports barge-in (user interrupting agent)
+     * This handler enables real-time, natural conversation
+     */
+    socket.on('interrupt', () => {
+      try {
+        logger.info('Interrupt request received', { socketId: socket.id, sessionId });
+
+        // Stop the agent (Deepgram will stop TTS output)
+        voiceController.interruptAgent(sessionId);
+
+        socket.emit('agent_interrupted', {
+          message: 'Agent stopped - ready for new input',
+          sessionId
+        });
+
+        logger.debug('Agent interrupted successfully', { socketId: socket.id, sessionId });
+      } catch (error) {
+        logger.error('Failed to interrupt agent', {
+          socketId: socket.id,
+          sessionId,
+          error: error.message
+        });
+        socket.emit('error', {
+          message: 'Failed to interrupt agent',
+          code: 'INTERRUPT_ERROR'
+        });
+      }
+    });
+
+    /**
+     * 'update_system_prompt' event
+     * Client sends this to inject user context into the LLM
+     * Allows personalizing the agent with user data (tasks, calendar, preferences)
+     * 
+     * This is critical for:
+     * - Personalizing responses with user context
+     * - Injecting tasks/calendar/integrations data
+     * - Customizing agent behavior based on user preferences
+     * - Real-time context updates during conversation
+     */
+    socket.on('update_system_prompt', (data) => {
+      try {
+        const { prompt } = data;
+
+        if (!prompt || typeof prompt !== 'string') {
+          logger.warn('Invalid prompt data', { 
+            socketId: socket.id, 
+            sessionId,
+            promptType: typeof prompt
+          });
+          socket.emit('error', {
+            message: 'Invalid prompt format. Expected string.',
+            code: 'INVALID_PROMPT_FORMAT'
+          });
+          return;
+        }
+
+        logger.info('Update system prompt request', { 
+          socketId: socket.id, 
+          sessionId,
+          promptLength: prompt.length
+        });
+
+        // Update Deepgram LLM system prompt (instructions)
+        voiceController.updateSystemPrompt(sessionId, prompt);
+
+        socket.emit('prompt_updated', {
+          message: 'System prompt updated successfully',
+          sessionId,
+          promptLength: prompt.length
+        });
+
+        logger.debug('System prompt updated', { 
+          socketId: socket.id, 
+          sessionId,
+          promptLength: prompt.length
+        });
+      } catch (error) {
+        logger.error('Failed to update system prompt', {
+          socketId: socket.id,
+          sessionId,
+          error: error.message
+        });
+        socket.emit('error', {
+          message: 'Failed to update system prompt',
+          code: 'PROMPT_UPDATE_ERROR'
+        });
+      }
+    });
+
     // ==========================================
     // Disconnection Handlers
     // ==========================================
