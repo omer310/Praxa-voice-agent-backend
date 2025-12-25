@@ -602,31 +602,53 @@ class DeepgramService {
         return false;
       }
 
+      // DEBUG: Check connection state before sending
+      const hasSendMethod = typeof connection.send === 'function';
+      const wsState = connection._socket?.readyState ?? connection.ws?.readyState ?? connection.socket?.readyState ?? 'unknown';
+      
+      if (!hasSendMethod) {
+        console.error('❌ connection.send is NOT a function!', {
+          sessionId,
+          connectionType: typeof connection,
+          connectionKeys: Object.keys(connection || {}),
+          hasWs: !!connection.ws,
+          hasSocket: !!connection._socket
+        });
+        return false;
+      }
+
+      // Log occasionally (once per second of audio)
+      if (!this._lastAudioLog || Date.now() - this._lastAudioLog > 1000) {
+        console.log('🎤 Sending audio to Deepgram', { 
+          sessionId, 
+          size: byteLength,
+          wsState,
+          hasSendMethod
+        });
+        this._lastAudioLog = Date.now();
+      }
+
       // Send audio to Deepgram
       // Note: send() is async per SDK #366, but we don't await here for performance
       // In high-frequency streaming, fire-and-forget is necessary
       connection.send(audioBuffer).catch((error) => {
-        logger.error('Error sending audio buffer', { 
+        console.error('❌ Async error sending audio buffer', { 
           sessionId, 
-          error: error?.message || error,
+          error: error?.message || String(error),
+          errorStack: error?.stack,
           size: byteLength
         });
       });
 
-      // Only log occasionally to reduce noise (every ~1 second of audio at 16kHz)
-      // 16000 samples/sec * 2 bytes/sample = 32000 bytes/sec
-      // Log every 32000 bytes = every second
-      logger.debug('Audio sent to Voice Agent', { 
-        sessionId, 
-        size: byteLength
-      });
-
       return true;
     } catch (error) {
-      logger.error('Failed to send audio to Voice Agent', { 
+      console.error('❌ SYNC error in sendAudio', { 
         sessionId, 
         error: error.message,
-        errorCode: error.code
+        errorStack: error.stack,
+        errorCode: error.code,
+        audioBufferType: typeof audioBuffer,
+        audioBufferSize: audioBuffer?.byteLength || audioBuffer?.length
       });
       return false;
     }
