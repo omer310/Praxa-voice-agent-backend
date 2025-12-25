@@ -117,6 +117,7 @@ class DeepgramService {
     // Voice Agent connections
     this.agentConnections = new Map(); // Map of sessionId -> agent connection
     this.eventHandlers = new Map(); // Map of sessionId -> client event handlers
+    this.readyConnections = new Map(); // Map of sessionId -> boolean (true when SettingsApplied received)
     
     // Initialize Deepgram client with SDK v4
     // Note: endpoint is passed directly to agent() method, not in client init
@@ -306,7 +307,10 @@ class DeepgramService {
         // Voice Agent sends this after valid settings are received
         connection.on(AgentEvents.SettingsApplied, (data) => {
           try {
+            // CRITICAL: Mark connection as ready for audio streaming
+            this.readyConnections.set(sessionId, true);
             logger.info('✅ SETTINGS APPLIED - Deepgram Voice Agent is fully ready!', { sessionId, data });
+            logger.info('🎤 Connection is now READY to receive audio', { sessionId });
             eventHandlers.onSettingsApplied?.({
               message: 'Voice Agent settings configured successfully'
             });
@@ -511,6 +515,7 @@ class DeepgramService {
           
           this.agentConnections.delete(sessionId);
           this.eventHandlers.delete(sessionId);
+          this.readyConnections.delete(sessionId); // Clean up ready state
           eventHandlers.onClose?.();
         });
 
@@ -573,27 +578,28 @@ class DeepgramService {
   sendAudio(sessionId, audioBuffer) {
     const connection = this.agentConnections.get(sessionId);
     if (!connection) {
-      logger.warn('Cannot send audio: no active Voice Agent connection', { sessionId });
+      // Don't log every time - this happens frequently before connection is established
+      return false;
+    }
+
+    // CRITICAL: Check if connection is ready (SettingsApplied received)
+    // This fixes the race condition where frontend sends audio before Deepgram is ready
+    if (!this.readyConnections.get(sessionId)) {
+      // Silently drop audio - connection not ready yet
+      // This is expected during the brief initialization period
       return false;
     }
 
     try {
       // Validate audio buffer
       if (!audioBuffer) {
-        logger.warn('Audio buffer is null or undefined', { sessionId });
         return false;
       }
 
       // Check for zero-byte audio (common Expo issue)
       const byteLength = audioBuffer.byteLength || audioBuffer.length;
       if (byteLength === 0) {
-        logger.warn('Zero-byte audio detected, skipping', { sessionId });
         return false;
-      }
-
-      // Log audio metrics for debugging Expo integration
-      if (byteLength < 160) { // Less than 10ms at 16kHz
-        logger.debug('Very small audio chunk', { sessionId, bytes: byteLength, duration: '< 10ms' });
       }
 
       // Send audio to Deepgram
@@ -607,10 +613,12 @@ class DeepgramService {
         });
       });
 
+      // Only log occasionally to reduce noise (every ~1 second of audio at 16kHz)
+      // 16000 samples/sec * 2 bytes/sample = 32000 bytes/sec
+      // Log every 32000 bytes = every second
       logger.debug('Audio sent to Voice Agent', { 
         sessionId, 
-        size: byteLength,
-        estimatedDuration: `${(byteLength / 32).toFixed(0)}ms`
+        size: byteLength
       });
 
       return true;
@@ -797,6 +805,7 @@ class DeepgramService {
         // Clean up stored references
         this.agentConnections.delete(sessionId);
         this.eventHandlers.delete(sessionId);
+        this.readyConnections.delete(sessionId); // Clean up ready state
         
         logger.info('Voice Agent connection closed successfully', { sessionId });
       } catch (error) {
