@@ -118,18 +118,13 @@ class DeepgramService {
     this.agentConnections = new Map(); // Map of sessionId -> agent connection
     this.eventHandlers = new Map(); // Map of sessionId -> client event handlers
     
-    // Initialize Deepgram client with proper SDK v4 configuration
-    // SDK v4 requires explicit endpoint configuration to avoid undefined endpoint error
-    this.deepgramClient = createClient(config.deepgramApiKey, {
-      global: {
-        url: 'https://api.deepgram.com'
-      }
-    });
+    // Initialize Deepgram client with SDK v4
+    // Note: endpoint is passed directly to agent() method, not in client init
+    this.deepgramClient = createClient(config.deepgramApiKey);
     
     // Log available methods for debugging
     logger.info('🔧 Deepgram client initialized with SDK v4', {
       clientType: typeof this.deepgramClient,
-      availableMethods: Object.keys(this.deepgramClient),
       hasAgent: typeof this.deepgramClient.agent,
       hasListen: typeof this.deepgramClient.listen,
       hasSpeak: typeof this.deepgramClient.speak,
@@ -199,20 +194,24 @@ class DeepgramService {
         });
 
         // Connect to Voice Agent API
-        // Updated method name: deepgram.agent() not deepgram.agent.converse()
-        logger.info('🔌 Calling deepgramClient.agent()...', { sessionId });
+        // SDK v4 agent() method signature: agent(endpoint?: string): AgentLiveClient
+        // The endpoint parameter is REQUIRED to avoid "endpoint.replace is not a function" error
+        logger.info('🔌 Calling deepgramClient.agent() with endpoint...', { sessionId });
         
         if (typeof this.deepgramClient.agent !== 'function') {
           throw new Error(`deepgramClient.agent is not a function. Type: ${typeof this.deepgramClient.agent}. Available methods: ${Object.keys(this.deepgramClient).join(', ')}`);
         }
         
-        const connection = this.deepgramClient.agent(agentConfig);
-        logger.info('✅ deepgramClient.agent() called successfully', { sessionId });
+        // Pass the WebSocket endpoint as the first parameter (string)
+        const endpoint = 'wss://api.deepgram.com/v1/agent';
+        const connection = this.deepgramClient.agent(endpoint);
+        logger.info('✅ AgentLiveClient created', { sessionId, endpoint });
 
-        // Store handlers
+        // Store handlers and connection
         this.eventHandlers.set(sessionId, eventHandlers);
         this.agentConnections.set(sessionId, connection);
 
+        // IMPORTANT: Set up event handlers BEFORE configuring to avoid missing events
         // Handle Open event
         connection.on(AgentEvents.Open, () => {
           clearTimeout(connectionTimeout); // Clear timeout on successful connection
@@ -371,6 +370,12 @@ class DeepgramService {
           // AgentThinking may not be available yet
           logger.debug('AgentThinking event not available', { sessionId });
         }
+
+        // NOW configure the agent after all event handlers are set up
+        // This triggers the WebSocket connection and sends the Settings message
+        logger.info('⚙️ Configuring agent and initiating connection...', { sessionId });
+        connection.configure(agentConfig);
+        logger.info('✅ Agent configuration sent, waiting for connection...', { sessionId });
 
       } catch (error) {
         clearTimeout(connectionTimeout); // Clear timeout on error
