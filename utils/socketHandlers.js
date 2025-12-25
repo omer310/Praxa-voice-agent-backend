@@ -17,6 +17,23 @@ function initializeSocketHandlers(io) {
       sessionId
     });
 
+    // Create session in activeSessions if it doesn't exist
+    // This ensures session exists for all subsequent handlers
+    let session = voiceController.getSession(sessionId);
+    if (!session) {
+      // Create a new session for this Socket.io connection
+      const sessionData = {
+        userId,
+        sessionId,
+        startedAt: new Date(),
+        status: 'initialized',
+        transcripts: [],
+        isConnectedToDeepgram: false
+      };
+      voiceController.activeSessions.set(sessionId, sessionData);
+      logger.debug('Session created for Socket.io connection', { sessionId, userId });
+    }
+
     // Send authentication confirmation
     socket.emit('authenticated', {
       message: 'Successfully authenticated',
