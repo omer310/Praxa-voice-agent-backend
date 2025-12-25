@@ -156,43 +156,48 @@ class DeepgramService {
       try {
         logger.info('🚀 Connecting to Deepgram Voice Agent API', { sessionId });
 
-        // Configure Voice Agent with your LLM of choice
-        // Note: Input and output audio default to linear16 at 16000 Hz but are configurable
+        // Configure Voice Agent according to Deepgram Voice Agent API spec
+        // Structure: { agent: { listen, think, speak, greeting } }
+        // See: https://developers.deepgram.com/docs/voice-agent-settings
         const agentConfig = {
-          model: 'default', // Uses Flux for STT by default
-          language: 'en-US',
-          listen: {
-            model: config.deepgramListenModel || 'nova-3'
-          },
-          think: {
-            provider: {
-              type: config.deepgramLLMProvider || 'open_ai', // 'open_ai', 'anthropic', 'google', 'groq'
-              model: config.deepgramLLMModel || 'gpt-4o-mini',
-              api_key: config.openaiApiKey // Pass OpenAI API key to Voice Agent
+          agent: {
+            listen: {
+              provider: {
+                type: 'deepgram',
+                model: config.deepgramListenModel || 'nova-3'
+              }
             },
-            instructions: config.deepgramSystemPrompt || 'You are a helpful voice assistant. Keep responses concise and natural for voice conversation.'
-          },
-          speak: {
-            model: config.deepgramVoiceModel || 'aura-asteria-en'
-          },
-          // Optional greeting message to start the conversation
-          greeting: config.deepgramGreeting || 'Hello! How can I help you today?'
-          
-          // NOTE: eot_timeout_ms removed - was causing UNPARSABLE_CLIENT_MESSAGE error
-          // The field may not be valid at top-level or has a different format requirement
-          // Can be re-added once we verify the correct API spec
+            think: {
+              provider: {
+                type: config.deepgramLLMProvider || 'open_ai',
+                model: config.deepgramLLMModel || 'gpt-4o-mini'
+              },
+              // System prompt for the LLM
+              prompt: config.deepgramSystemPrompt || 'You are a helpful voice assistant. Keep responses concise and natural for voice conversation.'
+            },
+            speak: {
+              provider: {
+                type: 'deepgram',
+                model: config.deepgramVoiceModel || 'aura-2-thalia-en'
+              }
+            },
+            // Greeting message spoken when conversation starts
+            greeting: config.deepgramGreeting || 'Hello! How can I help you today?'
+          }
         };
 
         logger.info('📋 Agent config prepared', { 
           sessionId,
-          listenModel: agentConfig.listen.model,
-          llmProvider: agentConfig.think.provider.type,
-          llmModel: agentConfig.think.provider.model,
-          speakModel: agentConfig.speak.model,
-          hasOpenAIKey: !!agentConfig.think.provider.api_key,
-          openAIKeyLength: agentConfig.think.provider.api_key?.length || 0,
-          hasGreeting: !!agentConfig.greeting,
-          greetingLength: agentConfig.greeting?.length || 0
+          listenProvider: agentConfig.agent.listen.provider.type,
+          listenModel: agentConfig.agent.listen.provider.model,
+          thinkProvider: agentConfig.agent.think.provider.type,
+          thinkModel: agentConfig.agent.think.provider.model,
+          speakProvider: agentConfig.agent.speak.provider.type,
+          speakModel: agentConfig.agent.speak.provider.model,
+          hasPrompt: !!agentConfig.agent.think.prompt,
+          promptLength: agentConfig.agent.think.prompt?.length || 0,
+          hasGreeting: !!agentConfig.agent.greeting,
+          greetingLength: agentConfig.agent.greeting?.length || 0
         });
         
         // Validate API keys before attempting connection
@@ -253,14 +258,13 @@ class DeepgramService {
           logger.info('⚙️ Sending Settings to Deepgram (WebSocket is now open)...', { 
             sessionId,
             configSummary: {
-              model: agentConfig.model,
-              language: agentConfig.language,
-              listenModel: agentConfig.listen.model,
-              llmType: agentConfig.think.provider.type,
-              llmModel: agentConfig.think.provider.model,
-              hasLLMKey: !!agentConfig.think.provider.api_key,
-              speakModel: agentConfig.speak.model,
-              hasGreeting: !!agentConfig.greeting
+              listenProvider: agentConfig.agent.listen.provider.type,
+              listenModel: agentConfig.agent.listen.provider.model,
+              thinkProvider: agentConfig.agent.think.provider.type,
+              thinkModel: agentConfig.agent.think.provider.model,
+              speakProvider: agentConfig.agent.speak.provider.type,
+              speakModel: agentConfig.agent.speak.provider.model,
+              hasGreeting: !!agentConfig.agent.greeting
             }
           });
           
