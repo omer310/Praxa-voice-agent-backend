@@ -170,7 +170,8 @@ class DeepgramService {
         };
 
         // Connect to Voice Agent API
-        const connection = this.deepgramClient.agent.converse(agentConfig);
+        // Updated method name: deepgram.agent() not deepgram.agent.converse()
+        const connection = this.deepgramClient.agent(agentConfig);
 
         // Store handlers
         this.eventHandlers.set(sessionId, eventHandlers);
