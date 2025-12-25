@@ -167,7 +167,8 @@ class DeepgramService {
           think: {
             provider: {
               type: config.deepgramLLMProvider || 'open_ai', // 'open_ai', 'anthropic', 'google', 'groq'
-              model: config.deepgramLLMModel || 'gpt-4o-mini'
+              model: config.deepgramLLMModel || 'gpt-4o-mini',
+              api_key: config.openaiApiKey // Pass OpenAI API key to Voice Agent
             },
             instructions: config.deepgramSystemPrompt || 'You are a helpful voice assistant. Keep responses concise and natural for voice conversation.'
           },
@@ -190,7 +191,24 @@ class DeepgramService {
           listenModel: agentConfig.listen.model,
           llmProvider: agentConfig.think.provider.type,
           llmModel: agentConfig.think.provider.model,
-          speakModel: agentConfig.speak.model
+          speakModel: agentConfig.speak.model,
+          hasOpenAIKey: !!agentConfig.think.provider.api_key,
+          openAIKeyLength: agentConfig.think.provider.api_key?.length || 0,
+          hasGreeting: !!agentConfig.greeting,
+          greetingLength: agentConfig.greeting?.length || 0
+        });
+        
+        // Validate API keys before attempting connection
+        if (!config.deepgramApiKey || config.deepgramApiKey.length < 10) {
+          throw new Error('Invalid or missing DEEPGRAM_API_KEY');
+        }
+        if (!config.openaiApiKey || config.openaiApiKey.length < 10) {
+          throw new Error('Invalid or missing OPENAI_API_KEY');
+        }
+        logger.info('✅ API keys validated', {
+          sessionId,
+          deepgramKeyPrefix: config.deepgramApiKey.substring(0, 8) + '...',
+          openaiKeyPrefix: config.openaiApiKey.substring(0, 8) + '...'
         });
 
         // Connect to Voice Agent API
@@ -308,12 +326,39 @@ class DeepgramService {
             const errorMessage = error?.message || error?.toString() || 'Unknown error';
             const errorCode = error?.code || 'UNKNOWN_ERROR';
             
-            logger.error('Deepgram Voice Agent error', { 
+            // Enhanced error debugging
+            logger.error('❌ Deepgram Voice Agent error (DETAILED)', { 
               sessionId, 
-              error: errorMessage,
-              code: errorCode,
-              type: error?.type || 'application'
+              errorMessage: errorMessage,
+              errorCode: errorCode,
+              errorType: error?.type || 'unknown',
+              errorName: error?.name,
+              // WebSocket specific details
+              wsReadyState: connection?.ws?.readyState,
+              wsUrl: connection?.ws?.url,
+              wsProtocol: connection?.ws?.protocol,
+              // Full error object for debugging
+              fullError: JSON.stringify(error, Object.getOwnPropertyNames(error)),
+              // Connection state
+              connectionState: {
+                isConnected: !!connection,
+                hasWebSocket: !!connection?.ws,
+                timestamp: new Date().toISOString()
+              }
             });
+
+            // Specific error type detection
+            if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+              logger.error('🔑 API KEY ERROR: Deepgram API key is invalid or unauthorized');
+            } else if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+              logger.error('🚫 ACCESS ERROR: Voice Agent API access denied - check if feature is enabled');
+            } else if (errorMessage.includes('WebSocket') || errorMessage.includes('connection')) {
+              logger.error('🌐 NETWORK ERROR: WebSocket connection failed - check network/firewall');
+            } else if (errorMessage.includes('timeout')) {
+              logger.error('⏱️ TIMEOUT ERROR: Connection timed out');
+            } else if (errorMessage.includes('openai') || errorMessage.includes('api_key')) {
+              logger.error('🔑 OPENAI KEY ERROR: OpenAI API key issue');
+            }
 
             // Pass structured error to handler
             eventHandlers.onError?.({
@@ -331,8 +376,24 @@ class DeepgramService {
         });
 
         // Handle Close
-        connection.on(AgentEvents.Close, () => {
-          logger.info('Disconnected from Deepgram Voice Agent API', { sessionId });
+        connection.on(AgentEvents.Close, (event) => {
+          logger.info('🔌 Disconnected from Deepgram Voice Agent API', { 
+            sessionId,
+            closeCode: event?.code,
+            closeReason: event?.reason || 'No reason provided',
+            wasClean: event?.wasClean,
+            // Standard WebSocket close codes
+            closeCodeMeaning: event?.code === 1000 ? 'Normal closure' :
+                            event?.code === 1001 ? 'Going away' :
+                            event?.code === 1002 ? 'Protocol error' :
+                            event?.code === 1003 ? 'Unsupported data' :
+                            event?.code === 1006 ? 'Abnormal closure (no close frame)' :
+                            event?.code === 1007 ? 'Invalid frame payload data' :
+                            event?.code === 1008 ? 'Policy violation' :
+                            event?.code === 1009 ? 'Message too big' :
+                            event?.code === 1011 ? 'Internal server error' :
+                            'Unknown close code'
+          });
           
           // Clear keep-alive interval
           if (this.keepAliveIntervals && this.keepAliveIntervals.has(sessionId)) {
@@ -373,9 +434,43 @@ class DeepgramService {
 
         // NOW configure the agent after all event handlers are set up
         // This triggers the WebSocket connection and sends the Settings message
-        logger.info('⚙️ Configuring agent and initiating connection...', { sessionId });
-        connection.configure(agentConfig);
-        logger.info('✅ Agent configuration sent, waiting for connection...', { sessionId });
+        logger.info('⚙️ Configuring agent and initiating connection...', { 
+          sessionId,
+          configSummary: {
+            model: agentConfig.model,
+            language: agentConfig.language,
+            listenModel: agentConfig.listen.model,
+            llmType: agentConfig.think.provider.type,
+            llmModel: agentConfig.think.provider.model,
+            hasLLMKey: !!agentConfig.think.provider.api_key,
+            speakModel: agentConfig.speak.model,
+            hasGreeting: !!agentConfig.greeting,
+            eotTimeout: agentConfig.eot_timeout_ms
+          }
+        });
+        
+        try {
+          connection.configure(agentConfig);
+          logger.info('✅ Agent configuration sent successfully, waiting for connection...', { sessionId });
+          
+          // Log WebSocket state after configure
+          setTimeout(() => {
+            logger.info('🔍 WebSocket state check (2s after configure)', {
+              sessionId,
+              wsReadyState: connection?.ws?.readyState,
+              wsReadyStateText: ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][connection?.ws?.readyState] || 'UNKNOWN',
+              wsUrl: connection?.ws?.url,
+              hasConnection: !!connection
+            });
+          }, 2000);
+        } catch (configError) {
+          logger.error('❌ CRITICAL: Failed to call connection.configure()', {
+            sessionId,
+            error: configError.message,
+            stack: configError.stack
+          });
+          throw configError;
+        }
 
       } catch (error) {
         clearTimeout(connectionTimeout); // Clear timeout on error
