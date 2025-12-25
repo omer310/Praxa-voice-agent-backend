@@ -5,8 +5,8 @@ const logger = require('../utils/logger');
 /**
  * Deepgram Voice Agent Service
  * 
- * LAST UPDATED: December 24, 2025
- * SDK VERSION: v4.7.0 (June 25, 2025)
+ * LAST UPDATED: December 25, 2025
+ * SDK VERSION: v4.11.3 (Latest Stable - December 2025)
  * 
  * ⚠️ KNOWN ISSUES FROM GITHUB (December 2025):
  * 
@@ -118,11 +118,12 @@ class DeepgramService {
     this.agentConnections = new Map(); // Map of sessionId -> agent connection
     this.eventHandlers = new Map(); // Map of sessionId -> client event handlers
     
-    // Initialize Deepgram client
+    // Initialize Deepgram client - using default endpoint only
+    // Custom endpoint causes "endpoint.replace is not a function" error in SDK v3.13.0
     this.deepgramClient = createClient(config.deepgramApiKey);
     
     // Log available methods for debugging
-    logger.info('🔧 Deepgram client initialized', {
+    logger.info('🔧 Deepgram client initialized (using SDK defaults)', {
       clientType: typeof this.deepgramClient,
       availableMethods: Object.keys(this.deepgramClient),
       hasAgent: typeof this.deepgramClient.agent,
