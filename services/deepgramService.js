@@ -629,27 +629,21 @@ class DeepgramService {
       }
 
       // Send audio to Deepgram
-      // Note: send() is async per SDK #366, but we don't await here for performance
-      // In high-frequency streaming, fire-and-forget is necessary
-      connection.send(audioBuffer).catch((error) => {
-        console.error('❌ Async error sending audio buffer', { 
-          sessionId, 
-          error: error?.message || String(error),
-          errorStack: error?.stack,
-          size: byteLength
-        });
-      });
+      // IMPORTANT: send() is SYNCHRONOUS in the Deepgram SDK - it does NOT return a Promise!
+      // Calling .catch() on undefined was causing all the errors
+      connection.send(audioBuffer);
 
       return true;
     } catch (error) {
-      console.error('❌ SYNC error in sendAudio', { 
-        sessionId, 
-        error: error.message,
-        errorStack: error.stack,
-        errorCode: error.code,
-        audioBufferType: typeof audioBuffer,
-        audioBufferSize: audioBuffer?.byteLength || audioBuffer?.length
-      });
+      // Only log errors occasionally to avoid spam
+      if (!this._lastAudioError || Date.now() - this._lastAudioError > 5000) {
+        console.error('❌ Error in sendAudio', { 
+          sessionId, 
+          error: error.message,
+          errorCode: error.code
+        });
+        this._lastAudioError = Date.now();
+      }
       return false;
     }
   }
