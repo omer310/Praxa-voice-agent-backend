@@ -28,7 +28,8 @@ function initializeSocketHandlers(io) {
         startedAt: new Date(),
         status: 'initialized',
         transcripts: [],
-        isConnectedToDeepgram: false
+        isConnectedToDeepgram: false,
+        settingsApplied: false  // Track if Deepgram Settings have been confirmed
       };
       voiceController.activeSessions.set(sessionId, sessionData);
       logger.debug('Session created for Socket.io connection', { sessionId, userId });
@@ -70,6 +71,13 @@ function initializeSocketHandlers(io) {
             // NOW it's safe to emit voice_initialized!
             // Deepgram has confirmed Settings, so updatePrompt will work
             logger.info('⚙️ Settings applied from Deepgram - NOW emitting voice_initialized', { sessionId });
+            
+            // Mark settings as applied so updatePrompt is allowed
+            const sessionData = voiceController.getSession(sessionId);
+            if (sessionData) {
+              sessionData.settingsApplied = true;
+            }
+            
             socket.emit('settings_applied', data);
             
             // Emit voice_initialized AFTER SettingsApplied
@@ -306,6 +314,23 @@ function initializeSocketHandlers(io) {
           socket.emit('error', {
             message: 'Invalid prompt format. Expected string.',
             code: 'INVALID_PROMPT_FORMAT'
+          });
+          return;
+        }
+
+        // Check if Deepgram Settings have been applied
+        // CRITICAL: updatePrompt MUST NOT be called before Settings are confirmed!
+        const sessionData = voiceController.getSession(sessionId);
+        if (!sessionData?.settingsApplied) {
+          logger.warn('⚠️ update_system_prompt called BEFORE SettingsApplied! Rejecting.', { 
+            socketId: socket.id, 
+            sessionId,
+            settingsApplied: sessionData?.settingsApplied,
+            isConnectedToDeepgram: sessionData?.isConnectedToDeepgram
+          });
+          socket.emit('error', {
+            message: 'Voice session not ready. Please wait for voice_initialized event before updating prompt.',
+            code: 'SETTINGS_NOT_APPLIED'
           });
           return;
         }
