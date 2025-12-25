@@ -59,24 +59,28 @@ function initializeSocketHandlers(io) {
         });
 
         // Register event handlers for this socket BEFORE connecting
-        // This ensures they're in place when Deepgram's Open event fires
+        // This ensures they're in place when Deepgram's events fire
         voiceController.registerEventHandlers(sessionId, {
           onOpen: () => {
-            // Emit voice_initialized ONLY after Deepgram connection is fully open
-            // This ensures Settings have been sent before frontend calls updatePrompt
-            logger.info('✅ Deepgram WebSocket OPEN - emitting voice_initialized', { sessionId });
+            // WebSocket is open, but Settings haven't been confirmed yet
+            // DO NOT emit voice_initialized here - wait for SettingsApplied!
+            logger.info('✅ Deepgram WebSocket OPEN - waiting for SettingsApplied...', { sessionId });
+          },
+          onSettingsApplied: (data) => {
+            // NOW it's safe to emit voice_initialized!
+            // Deepgram has confirmed Settings, so updatePrompt will work
+            logger.info('⚙️ Settings applied from Deepgram - NOW emitting voice_initialized', { sessionId });
+            socket.emit('settings_applied', data);
+            
+            // Emit voice_initialized AFTER SettingsApplied
             socket.emit('voice_initialized', {
               message: 'Voice session initialized and ready',
               sessionId
             });
-            logger.info('✅ Voice session fully initialized and ready', { 
+            logger.info('✅ Voice session fully initialized and ready (after SettingsApplied)', { 
               socketId: socket.id, 
               sessionId 
             });
-          },
-          onSettingsApplied: (data) => {
-            logger.info('⚙️ Settings applied from Deepgram', { sessionId });
-            socket.emit('settings_applied', data);
           },
           onTranscript: (data) => {
             logger.info('📝 Transcript received', { 
