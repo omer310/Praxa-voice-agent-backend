@@ -118,17 +118,22 @@ class DeepgramService {
     this.agentConnections = new Map(); // Map of sessionId -> agent connection
     this.eventHandlers = new Map(); // Map of sessionId -> client event handlers
     
-    // Initialize Deepgram client - using default endpoint only
-    // Custom endpoint causes "endpoint.replace is not a function" error in SDK v3.13.0
-    this.deepgramClient = createClient(config.deepgramApiKey);
+    // Initialize Deepgram client with proper SDK v4 configuration
+    // SDK v4 requires explicit endpoint configuration to avoid undefined endpoint error
+    this.deepgramClient = createClient(config.deepgramApiKey, {
+      global: {
+        url: 'https://api.deepgram.com'
+      }
+    });
     
     // Log available methods for debugging
-    logger.info('🔧 Deepgram client initialized (using SDK defaults)', {
+    logger.info('🔧 Deepgram client initialized with SDK v4', {
       clientType: typeof this.deepgramClient,
       availableMethods: Object.keys(this.deepgramClient),
       hasAgent: typeof this.deepgramClient.agent,
       hasListen: typeof this.deepgramClient.listen,
-      hasSpeak: typeof this.deepgramClient.speak
+      hasSpeak: typeof this.deepgramClient.speak,
+      sdkVersion: '4.11.3'
     });
   }
 
