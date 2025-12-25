@@ -176,14 +176,11 @@ class DeepgramService {
             model: config.deepgramVoiceModel || 'aura-asteria-en'
           },
           // Optional greeting message to start the conversation
-          greeting: config.deepgramGreeting || 'Hello! How can I help you today?',
-          // Flux end-of-turn timeout (default 5000ms, max 10000ms)
-          // This is the maximum silence allowed before a turn is forcefully ended
-          eot_timeout_ms: config.deepgramEotTimeout || 5000
+          greeting: config.deepgramGreeting || 'Hello! How can I help you today?'
           
-          // Optional: Agent context for maintaining conversation state
-          // Documented in: /docs/configure-voice-agent#agentcontext
-          // Can be configured via environment if needed
+          // NOTE: eot_timeout_ms removed - was causing UNPARSABLE_CLIENT_MESSAGE error
+          // The field may not be valid at top-level or has a different format requirement
+          // Can be re-added once we verify the correct API spec
         };
 
         logger.info('📋 Agent config prepared', { 
@@ -263,8 +260,7 @@ class DeepgramService {
               llmModel: agentConfig.think.provider.model,
               hasLLMKey: !!agentConfig.think.provider.api_key,
               speakModel: agentConfig.speak.model,
-              hasGreeting: !!agentConfig.greeting,
-              eotTimeout: agentConfig.eot_timeout_ms
+              hasGreeting: !!agentConfig.greeting
             }
           });
           
