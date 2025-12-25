@@ -86,6 +86,15 @@ function initializeSocketHandlers(io) {
             socket.emit('audio_response', audioBuffer);
           },
           onError: (error) => {
+            console.error('🚨 === SOCKET ERROR HANDLER START ===');
+            console.error('Session ID:', sessionId);
+            console.error('Error Object:', JSON.stringify(error, null, 2));
+            console.error('Error Message:', error.message);
+            console.error('Error Code:', error.code);
+            console.error('Error Type:', error.type);
+            console.error('Error Stack:', error.stack);
+            console.error('🚨 === SOCKET ERROR HANDLER END ===');
+            
             logger.error('❌ Deepgram error in session', { 
               sessionId, 
               error: error.message,

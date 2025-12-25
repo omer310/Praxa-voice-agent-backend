@@ -327,6 +327,19 @@ class DeepgramService {
             const errorMessage = error?.message || error?.toString() || 'Unknown error';
             const errorCode = error?.code || 'UNKNOWN_ERROR';
             
+            // Force explicit console output for Railway logs
+            console.error('🚨 === DEEPGRAM ERROR START ===');
+            console.error('Session ID:', sessionId);
+            console.error('Error Message:', errorMessage);
+            console.error('Error Code:', errorCode);
+            console.error('Error Type:', error?.type || 'unknown');
+            console.error('Error Name:', error?.name);
+            console.error('WS Ready State:', connection?.ws?.readyState);
+            console.error('WS URL:', connection?.ws?.url);
+            console.error('Full Error Object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+            console.error('Error Stack:', error?.stack);
+            console.error('🚨 === DEEPGRAM ERROR END ===');
+            
             // Enhanced error debugging
             logger.error('❌ Deepgram Voice Agent error (DETAILED)', { 
               sessionId, 
