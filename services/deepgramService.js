@@ -120,6 +120,15 @@ class DeepgramService {
     
     // Initialize Deepgram client
     this.deepgramClient = createClient(config.deepgramApiKey);
+    
+    // Log available methods for debugging
+    logger.info('🔧 Deepgram client initialized', {
+      clientType: typeof this.deepgramClient,
+      availableMethods: Object.keys(this.deepgramClient),
+      hasAgent: typeof this.deepgramClient.agent,
+      hasListen: typeof this.deepgramClient.listen,
+      hasSpeak: typeof this.deepgramClient.speak
+    });
   }
 
   /**
@@ -137,8 +146,14 @@ class DeepgramService {
    */
   async connect(sessionId, eventHandlers) {
     return new Promise((resolve, reject) => {
+      // Set a timeout for connection attempt (30 seconds)
+      const connectionTimeout = setTimeout(() => {
+        logger.error('❌ Connection timeout: Deepgram did not respond within 30 seconds', { sessionId });
+        reject(new Error('Connection timeout: Deepgram Voice Agent did not connect within 30 seconds'));
+      }, 30000);
+
       try {
-        logger.info('Connecting to Deepgram Voice Agent API', { sessionId });
+        logger.info('🚀 Connecting to Deepgram Voice Agent API', { sessionId });
 
         // Configure Voice Agent with your LLM of choice
         // Note: Input and output audio default to linear16 at 16000 Hz but are configurable
@@ -169,9 +184,24 @@ class DeepgramService {
           // Can be configured via environment if needed
         };
 
+        logger.info('📋 Agent config prepared', { 
+          sessionId,
+          listenModel: agentConfig.listen.model,
+          llmProvider: agentConfig.think.provider.type,
+          llmModel: agentConfig.think.provider.model,
+          speakModel: agentConfig.speak.model
+        });
+
         // Connect to Voice Agent API
         // Updated method name: deepgram.agent() not deepgram.agent.converse()
+        logger.info('🔌 Calling deepgramClient.agent()...', { sessionId });
+        
+        if (typeof this.deepgramClient.agent !== 'function') {
+          throw new Error(`deepgramClient.agent is not a function. Type: ${typeof this.deepgramClient.agent}. Available methods: ${Object.keys(this.deepgramClient).join(', ')}`);
+        }
+        
         const connection = this.deepgramClient.agent(agentConfig);
+        logger.info('✅ deepgramClient.agent() called successfully', { sessionId });
 
         // Store handlers
         this.eventHandlers.set(sessionId, eventHandlers);
@@ -179,7 +209,8 @@ class DeepgramService {
 
         // Handle Open event
         connection.on(AgentEvents.Open, () => {
-          logger.info('Connected to Deepgram Voice Agent API', { sessionId });
+          clearTimeout(connectionTimeout); // Clear timeout on successful connection
+          logger.info('✅ Connected to Deepgram Voice Agent API', { sessionId });
           
           // Set up keep-alive every 5 seconds
           const keepAliveInterval = setInterval(() => {
@@ -336,7 +367,14 @@ class DeepgramService {
         }
 
       } catch (error) {
-        logger.error('Failed to connect to Deepgram Voice Agent', { sessionId, error: error.message });
+        clearTimeout(connectionTimeout); // Clear timeout on error
+        logger.error('❌ CRITICAL: Failed to connect to Deepgram Voice Agent', { 
+          sessionId, 
+          errorMessage: error.message,
+          errorStack: error.stack,
+          errorName: error.name,
+          errorCode: error.code
+        });
         reject(error);
       }
     });

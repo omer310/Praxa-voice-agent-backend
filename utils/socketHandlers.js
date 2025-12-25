@@ -52,30 +52,52 @@ function initializeSocketHandlers(io) {
      */
     socket.on('initialize_voice', async () => {
       try {
-        logger.debug('Initialize voice request', { socketId: socket.id, sessionId });
+        logger.info('🎙️ Initialize voice request received', { 
+          socketId: socket.id, 
+          sessionId,
+          userId 
+        });
 
         // Initialize Deepgram connection
+        logger.info('🔗 Attempting to connect to Deepgram Voice Agent...', { sessionId });
         await voiceController.initializeDeepgramConnection(sessionId);
+        logger.info('✅ Deepgram connection established successfully', { sessionId });
 
         // Register event handlers for this socket
         voiceController.registerEventHandlers(sessionId, {
           onSettingsApplied: (data) => {
+            logger.info('⚙️ Settings applied from Deepgram', { sessionId });
             socket.emit('settings_applied', data);
           },
           onTranscript: (data) => {
+            logger.info('📝 Transcript received', { 
+              sessionId, 
+              type: data.type,
+              transcript: data.transcript 
+            });
             socket.emit('transcript', data);
           },
           onAgentAudio: (audioBuffer) => {
+            logger.info('🔊 Agent audio received', { 
+              sessionId, 
+              size: audioBuffer.length 
+            });
             // Send binary audio data
             socket.emit('audio_response', audioBuffer);
           },
           onError: (error) => {
+            logger.error('❌ Deepgram error in session', { 
+              sessionId, 
+              error: error.message,
+              stack: error.stack 
+            });
             socket.emit('error', {
               message: error.message,
               code: 'DEEPGRAM_ERROR'
             });
           },
           onClose: () => {
+            logger.info('🔌 Deepgram connection closed', { sessionId });
             socket.emit('voice_ended');
           }
         });
@@ -85,16 +107,23 @@ function initializeSocketHandlers(io) {
           sessionId
         });
 
-        logger.info('Voice session initialized', { socketId: socket.id, sessionId });
+        logger.info('✅ Voice session fully initialized and ready', { 
+          socketId: socket.id, 
+          sessionId 
+        });
       } catch (error) {
-        logger.error('Failed to initialize voice', {
+        logger.error('❌ CRITICAL: Failed to initialize voice session', {
           socketId: socket.id,
           sessionId,
-          error: error.message
+          userId,
+          errorMessage: error.message,
+          errorStack: error.stack,
+          errorName: error.name
         });
         socket.emit('error', {
           message: error.message,
-          code: 'INITIALIZATION_ERROR'
+          code: 'INITIALIZATION_ERROR',
+          details: error.stack
         });
       }
     });
