@@ -168,6 +168,15 @@ function initializeSocketHandlers(io) {
           return;
         }
 
+        // CRITICAL: Check if Deepgram Settings have been applied
+        // Sending audio before Settings = "Received binary message before Settings" error!
+        const sessionData = voiceController.getSession(sessionId);
+        if (!sessionData?.settingsApplied) {
+          // Silently drop audio until Settings are applied
+          // Don't log every packet to avoid flooding logs
+          return;
+        }
+
         logger.debug('Received audio data', {
           socketId: socket.id,
           sessionId,
