@@ -64,6 +64,13 @@ class VoiceController {
       }
 
       const eventHandlers = {
+        onOpen: () => {
+          sessionData.isConnectedToDeepgram = true;
+          logger.debug('Deepgram connection opened', { sessionId });
+          if (sessionData.onOpen) {
+            sessionData.onOpen();
+          }
+        },
         onSettingsApplied: (data) => {
           logger.debug('Settings applied', { sessionId });
           if (sessionData.onSettingsApplied) {
@@ -137,6 +144,7 @@ class VoiceController {
   registerEventHandlers(sessionId, handlers) {
     const sessionData = this.activeSessions.get(sessionId);
     if (sessionData) {
+      sessionData.onOpen = handlers.onOpen;
       sessionData.onSettingsApplied = handlers.onSettingsApplied;
       sessionData.onTranscript = handlers.onTranscript;
       sessionData.onAgentAudio = handlers.onAgentAudio;

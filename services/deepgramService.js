@@ -250,6 +250,9 @@ class DeepgramService {
           this.keepAliveIntervals = this.keepAliveIntervals || new Map();
           this.keepAliveIntervals.set(sessionId, keepAliveInterval);
           
+          // Notify that connection is fully open and ready
+          eventHandlers.onOpen?.();
+          
           resolve();
         });
 
