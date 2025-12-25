@@ -178,7 +178,7 @@ class DeepgramService {
             speak: {
               provider: {
                 type: 'deepgram',
-                model: config.deepgramVoiceModel || 'aura-2-thalia-en'
+                model: config.deepgramVoiceModel || 'aura-asteria-en'
               }
             },
             // Greeting message spoken when conversation starts
