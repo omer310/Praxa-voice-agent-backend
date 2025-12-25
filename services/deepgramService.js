@@ -361,19 +361,44 @@ class DeepgramService {
         // Handle Error - Both RFC-6455 protocol errors and Deepgram API errors
         connection.on(AgentEvents.Error, (error) => {
           try {
-            const errorMessage = error?.message || error?.toString() || 'Unknown error';
+            // CRITICAL: Ensure errorMessage is ALWAYS a string, never an object
+            let errorMessage = 'Unknown error';
+            if (typeof error === 'string') {
+              errorMessage = error;
+            } else if (error?.message) {
+              if (typeof error.message === 'string') {
+                errorMessage = error.message;
+              } else if (typeof error.message === 'object') {
+                // error.message is an object - this is the bug that caused [object Object]!
+                errorMessage = JSON.stringify(error.message);
+              }
+            } else if (error) {
+              try {
+                errorMessage = JSON.stringify(error);
+              } catch (e) {
+                errorMessage = String(error);
+              }
+            }
+            
             const errorCode = error?.code || 'UNKNOWN_ERROR';
             
             // Force explicit console output for Railway logs
             console.error('🚨 === DEEPGRAM ERROR START ===');
             console.error('Session ID:', sessionId);
-            console.error('Error Message:', errorMessage);
+            console.error('Error Message (string):', errorMessage);
+            console.error('Error Message Type:', typeof errorMessage);
+            console.error('Raw error.message:', error?.message);
+            console.error('Raw error.message type:', typeof error?.message);
             console.error('Error Code:', errorCode);
             console.error('Error Type:', error?.type || 'unknown');
             console.error('Error Name:', error?.name);
             console.error('WS Ready State:', connection?.ws?.readyState);
             console.error('WS URL:', connection?.ws?.url);
-            console.error('Full Error Object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+            try {
+              console.error('Full Error Object:', JSON.stringify(error, Object.getOwnPropertyNames(error || {}), 2));
+            } catch (e) {
+              console.error('Full Error Object: [Could not stringify]', String(error));
+            }
             console.error('Error Stack:', error?.stack);
             console.error('🚨 === DEEPGRAM ERROR END ===');
             

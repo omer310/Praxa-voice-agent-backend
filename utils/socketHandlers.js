@@ -107,23 +107,54 @@ function initializeSocketHandlers(io) {
             socket.emit('audio_response', audioBuffer);
           },
           onError: (error) => {
+            // Safely stringify the error object
+            let errorJson = 'Unable to stringify';
+            try {
+              errorJson = JSON.stringify(error, Object.getOwnPropertyNames(error || {}), 2);
+            } catch (e) {
+              errorJson = String(error);
+            }
+            
             console.error('🚨 === SOCKET ERROR HANDLER START ===');
             console.error('Session ID:', sessionId);
-            console.error('Error Object:', JSON.stringify(error, null, 2));
-            console.error('Error Message:', error.message);
-            console.error('Error Code:', error.code);
-            console.error('Error Type:', error.type);
-            console.error('Error Stack:', error.stack);
+            console.error('Error Object (full):', errorJson);
+            console.error('Error Message:', error?.message);
+            console.error('Error Message Type:', typeof error?.message);
+            console.error('Error Code:', error?.code);
+            console.error('Error Type:', error?.type);
+            console.error('Error Stack:', error?.stack);
             console.error('🚨 === SOCKET ERROR HANDLER END ===');
             
-            logger.error('❌ Deepgram error in session', { 
+            // Properly extract error message (it might be an object!)
+            let errorMessage = 'Unknown Deepgram error';
+            if (typeof error === 'string') {
+              errorMessage = error;
+            } else if (error?.message) {
+              if (typeof error.message === 'string') {
+                errorMessage = error.message;
+              } else if (typeof error.message === 'object') {
+                // error.message is an object - stringify it
+                errorMessage = JSON.stringify(error.message);
+              }
+            } else if (error) {
+              try {
+                errorMessage = JSON.stringify(error);
+              } catch (e) {
+                errorMessage = String(error);
+              }
+            }
+            
+            logger.error('❌ Deepgram error in session (DETAILED)', { 
               sessionId, 
-              error: error.message,
-              stack: error.stack 
+              errorMessage,
+              rawError: errorJson,
+              stack: error?.stack 
             });
+            
             socket.emit('error', {
-              message: error.message,
-              code: 'DEEPGRAM_ERROR'
+              message: errorMessage,
+              code: 'DEEPGRAM_ERROR',
+              details: errorJson
             });
           },
           onClose: () => {
