@@ -157,7 +157,7 @@ class DeepgramService {
         logger.info('🚀 Connecting to Deepgram Voice Agent API', { sessionId });
 
         // Configure Voice Agent according to Deepgram Twilio integration docs
-        // This is the EXACT structure from the working Python example
+        // Using aura-zeus-en (American Masculine voice)
         const agentConfig = {
           audio: {
             input: {
@@ -187,11 +187,16 @@ class DeepgramService {
             speak: {
               provider: {
                 type: 'deepgram',
-                model: config.deepgramVoiceModel || 'aura-2-thalia-en'
+                model: config.deepgramVoiceModel || 'aura-zeus-en'
               }
             }
           }
         };
+
+        // DEBUG: Log the FULL config as JSON to see exactly what we're sending
+        console.log('🔍 === FULL AGENT CONFIG (JSON) ===');
+        console.log(JSON.stringify(agentConfig, null, 2));
+        console.log('🔍 === END AGENT CONFIG ===');
 
         logger.info('📋 Agent config prepared', { 
           sessionId,
@@ -352,15 +357,35 @@ class DeepgramService {
         // Handle Agent Audio (TTS output)
         connection.on(AgentEvents.AgentAudio, (data) => {
           try {
-            logger.debug('Received agent audio', { sessionId, size: data.byteLength || data.length });
+            // DEBUG: Log every audio chunk received
+            console.log('🔊 AGENT AUDIO RECEIVED!', { 
+              sessionId, 
+              size: data?.byteLength || data?.length || 'unknown',
+              type: typeof data,
+              isBuffer: Buffer.isBuffer(data)
+            });
+            logger.info('🔊 Received agent audio', { sessionId, size: data?.byteLength || data?.length });
             eventHandlers.onAgentAudio?.(data);
           } catch (error) {
             logger.error('Error processing agent audio', { sessionId, error: error.message });
           }
         });
 
+        // DEBUG: Handle AgentStartedSpeaking event
+        connection.on(AgentEvents.AgentStartedSpeaking, (data) => {
+          console.log('🎤 === AGENT STARTED SPEAKING ===', { sessionId, data });
+          logger.info('🎤 Agent started speaking', { sessionId, data });
+        });
+
+        // DEBUG: Handle AgentAudioDone event
+        connection.on(AgentEvents.AgentAudioDone, (data) => {
+          console.log('✅ === AGENT AUDIO DONE ===', { sessionId, data });
+          logger.info('✅ Agent audio done', { sessionId, data });
+        });
+
         // Handle Metadata
         connection.on(AgentEvents.Metadata, (data) => {
+          console.log('📋 METADATA RECEIVED:', { sessionId, data });
           logger.debug('Received metadata', { sessionId, requestId: data?.request_id });
         });
 
