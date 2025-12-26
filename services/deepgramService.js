@@ -406,6 +406,37 @@ class DeepgramService {
           logger.debug('Received metadata', { sessionId, requestId: data?.request_id });
         });
 
+        // DEBUG: Log ALL events from the connection to see what we're missing
+        // Check if audio is coming through 'audio' or other events
+        const allAgentEvents = Object.values(AgentEvents);
+        console.log('🔍 All AgentEvents:', allAgentEvents);
+        
+        // Try listening to raw 'audio' event (not AgentEvents.AgentAudio)
+        connection.on('audio', (data) => {
+          console.log('🔊🔊 RAW AUDIO EVENT RECEIVED!', { 
+            sessionId, 
+            size: data?.byteLength || data?.length || 'unknown',
+            type: typeof data
+          });
+        });
+        
+        // Try listening to 'binary' event
+        connection.on('binary', (data) => {
+          console.log('📦 BINARY EVENT RECEIVED!', { 
+            sessionId, 
+            size: data?.byteLength || data?.length || 'unknown'
+          });
+        });
+        
+        // Try listening to 'message' event
+        connection.on('message', (data) => {
+          const dataType = typeof data;
+          const isBuffer = Buffer.isBuffer(data);
+          if (isBuffer || data instanceof ArrayBuffer || data?.byteLength) {
+            console.log('📨 MESSAGE EVENT (binary):', { sessionId, size: data?.byteLength || data?.length });
+          }
+        });
+
         // Handle Error - Both RFC-6455 protocol errors and Deepgram API errors
         connection.on(AgentEvents.Error, (error) => {
           try {
