@@ -376,16 +376,28 @@ class DeepgramService {
           }
         });
 
+        // DEBUG: Handle UserStartedSpeaking event
+        connection.on(AgentEvents.UserStartedSpeaking, (data) => {
+          console.log('👤 === USER STARTED SPEAKING ===', { sessionId, data });
+          logger.info('👤 User started speaking', { sessionId, data });
+        });
+
         // DEBUG: Handle AgentStartedSpeaking event
         connection.on(AgentEvents.AgentStartedSpeaking, (data) => {
-          console.log('🎤 === AGENT STARTED SPEAKING ===', { sessionId, data });
-          logger.info('🎤 Agent started speaking', { sessionId, data });
+          console.log('🤖 === AGENT STARTED SPEAKING ===', { sessionId, data });
+          logger.info('🤖 Agent started speaking', { sessionId, data });
         });
 
         // DEBUG: Handle AgentAudioDone event
         connection.on(AgentEvents.AgentAudioDone, (data) => {
           console.log('✅ === AGENT AUDIO DONE ===', { sessionId, data });
           logger.info('✅ Agent audio done', { sessionId, data });
+        });
+
+        // DEBUG: Handle ConversationText events
+        connection.on(AgentEvents.ConversationText, (data) => {
+          console.log('💬 === CONVERSATION TEXT ===', { sessionId, role: data?.role, content: data?.content?.substring(0, 100) });
+          logger.info('💬 Conversation text', { sessionId, data });
         });
 
         // Handle Metadata
@@ -617,13 +629,34 @@ class DeepgramService {
         return false;
       }
 
+      // DEBUG: Check if audio contains actual sound (not silence)
+      let audioView;
+      try {
+        if (Buffer.isBuffer(audioBuffer)) {
+          audioView = new Uint8Array(audioBuffer);
+        } else if (audioBuffer instanceof ArrayBuffer) {
+          audioView = new Uint8Array(audioBuffer);
+        } else if (audioBuffer.buffer) {
+          audioView = new Uint8Array(audioBuffer.buffer);
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      // Check if audio is all zeros (silence)
+      const isSilent = audioView && audioView.every(byte => byte === 0);
+      const firstBytes = audioView ? Array.from(audioView.slice(0, 10)).join(',') : 'unknown';
+
       // Log occasionally (once per second of audio)
       if (!this._lastAudioLog || Date.now() - this._lastAudioLog > 1000) {
         console.log('🎤 Sending audio to Deepgram', { 
           sessionId, 
           size: byteLength,
           wsState,
-          hasSendMethod
+          hasSendMethod,
+          bufferType: audioBuffer?.constructor?.name || typeof audioBuffer,
+          isSilent: isSilent || false,
+          firstBytes: firstBytes
         });
         this._lastAudioLog = Date.now();
       }
