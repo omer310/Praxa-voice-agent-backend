@@ -395,10 +395,21 @@ class DeepgramService {
           logger.info('✅ Agent audio done', { sessionId, data });
         });
 
-        // DEBUG: Handle ConversationText events
+        // Handle ConversationText events - forward to frontend
         connection.on(AgentEvents.ConversationText, (data) => {
-          console.log('💬 === CONVERSATION TEXT ===', { sessionId, role: data?.role, content: data?.content?.substring(0, 100) });
-          logger.info('💬 Conversation text', { sessionId, data });
+          try {
+            console.log('💬 === CONVERSATION TEXT ===', { sessionId, role: data?.role, content: data?.content?.substring(0, 100) });
+            logger.info('💬 Conversation text', { sessionId, data });
+            
+            // Forward to frontend via event handler
+            eventHandlers.onConversationText?.({
+              role: data.role,         // 'user' or 'assistant'
+              content: data.content,   // Text content
+              sessionId: sessionId
+            });
+          } catch (error) {
+            logger.error('Error processing conversation text', { sessionId, error: error.message });
+          }
         });
 
         // Handle Metadata

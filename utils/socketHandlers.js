@@ -98,6 +98,20 @@ function initializeSocketHandlers(io) {
             });
             socket.emit('transcript', data);
           },
+          onConversationText: (data) => {
+            logger.info('💬 Conversation text received', { 
+              sessionId, 
+              role: data.role,
+              content: data.content 
+            });
+            // Forward to frontend
+            socket.emit('conversation_text', {
+              role: data.role,         // 'user' or 'assistant'
+              content: data.content,   // Text content
+              sessionId: data.sessionId
+            });
+            console.log('✅ Forwarded conversation_text to frontend', { sessionId, role: data.role });
+          },
           onAgentAudio: (audioBuffer) => {
             logger.info('🔊 Agent audio received', { 
               sessionId, 
