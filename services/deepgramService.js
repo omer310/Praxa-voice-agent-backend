@@ -360,7 +360,8 @@ class DeepgramService {
         });
 
         // Handle Agent Audio (TTS output)
-        connection.on(AgentEvents.AgentAudio, (data) => {
+        // IMPORTANT: The event is AgentEvents.Audio, NOT AgentEvents.AgentAudio!
+        connection.on(AgentEvents.Audio, (data) => {
           try {
             // DEBUG: Log every audio chunk received
             console.log('🔊 AGENT AUDIO RECEIVED!', { 
