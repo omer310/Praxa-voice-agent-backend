@@ -1,0 +1,4 @@
+fastapi
+uvicorn[standard]
+livekit-api>=1.1.0
+pydantic
