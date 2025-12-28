@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from livekit import api
 import os
-from typing import Optional  # Add this
+from typing import Optional
 
 app = FastAPI()
 
@@ -17,8 +17,9 @@ app.add_middleware(
 class TokenRequest(BaseModel):
     roomName: str
     participantName: str
-    userId: Optional[str] = None  # Changed to Optional
-    grantId: Optional[str] = None  # Changed to Optional
+    userId: Optional[str] = None
+    emailGrantId: Optional[str] = None
+    calendarGrantId: Optional[str] = None
 
 @app.post("/token")
 async def create_token(request: TokenRequest):
@@ -37,17 +38,14 @@ async def create_token(request: TokenRequest):
             room=request.roomName,
         ))
         
-        # ALWAYS dispatch if we have userId
         if request.userId:
-            # Use empty string for None values
-            grant_id = request.grantId or ""
+            email_grant = request.emailGrantId or ""
+            calendar_grant = request.calendarGrantId or ""
             
-            metadata_json = f'{{"userId": "{request.userId}", "grantId": "{grant_id}"}}'
+            metadata_json = f'{{"userId": "{request.userId}", "emailGrantId": "{email_grant}", "calendarGrantId": "{calendar_grant}"}}'
             
-            # Add participant metadata
             token.with_metadata(metadata_json)
             
-            # Dispatch agent
             token.with_room_config(
                 api.RoomConfiguration(
                     agents=[
@@ -59,9 +57,9 @@ async def create_token(request: TokenRequest):
                 )
             )
             
-            print(f"[Token Server] Dispatching agent for userId: {request.userId}, grantId: {grant_id}")
+            print(f"[Token Server] Dispatching agent for userId: {request.userId}, emailGrant: {email_grant[:20] if email_grant else 'none'}, calendarGrant: {calendar_grant[:20] if calendar_grant else 'none'}")
         else:
-            print("[Token Server] Warning: No userId provided, agent not dispatched")
+            print("[Token Server] Warning: No userId provided")
         
         return {
             "token": token.to_jwt(),
