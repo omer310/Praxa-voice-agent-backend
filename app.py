@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from livekit import api
 import os
+from typing import Optional  # Add this
 
 app = FastAPI()
 
@@ -16,13 +17,12 @@ app.add_middleware(
 class TokenRequest(BaseModel):
     roomName: str
     participantName: str
-    userId: str = None
-    grantId: str = None  # Changed from nylasGrantId to grantId
+    userId: Optional[str] = None  # Changed to Optional
+    grantId: Optional[str] = None  # Changed to Optional
 
 @app.post("/token")
 async def create_token(request: TokenRequest):
     try:
-        # Get LiveKit credentials from environment
         livekit_url = os.environ.get("LIVEKIT_URL")
         livekit_api_key = os.environ.get("LIVEKIT_API_KEY")
         livekit_api_secret = os.environ.get("LIVEKIT_API_SECRET")
@@ -30,41 +30,47 @@ async def create_token(request: TokenRequest):
         if not all([livekit_url, livekit_api_key, livekit_api_secret]):
             raise HTTPException(status_code=500, detail="LiveKit credentials not configured")
         
-        # Create access token
         token = api.AccessToken(livekit_api_key, livekit_api_secret)
-        
         token.with_identity(request.participantName)
-        
-        # Add room join permissions
         token.with_grants(api.VideoGrants(
             room_join=True,
             room=request.roomName,
         ))
         
-        # Add user metadata and dispatch voice-assistant agent
-        if request.userId or request.grantId:
-            # Add metadata to participant
-            token.with_metadata(
-                f'{{"userId": "{request.userId or ""}", "grantId": "{request.grantId or ""}"}}'  # Changed field name
-            )
+        # ALWAYS dispatch if we have userId
+        if request.userId:
+            # Use empty string for None values
+            grant_id = request.grantId or ""
             
-            # Dispatch the voice-assistant agent with metadata
+            metadata_json = f'{{"userId": "{request.userId}", "grantId": "{grant_id}"}}'
+            
+            # Add participant metadata
+            token.with_metadata(metadata_json)
+            
+            # Dispatch agent
             token.with_room_config(
                 api.RoomConfiguration(
                     agents=[
                         api.RoomAgentDispatch(
                             agent_name="voice-assistant",
-                            metadata=f'{{"userId": "{request.userId or ""}", "grantId": "{request.grantId or ""}"}}'  # Changed field name
+                            metadata=metadata_json
                         )
                     ],
                 )
             )
+            
+            print(f"[Token Server] Dispatching agent for userId: {request.userId}, grantId: {grant_id}")
+        else:
+            print("[Token Server] Warning: No userId provided, agent not dispatched")
         
         return {
             "token": token.to_jwt(),
             "url": livekit_url
         }
     except Exception as e:
+        print(f"[Token Server] Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")
