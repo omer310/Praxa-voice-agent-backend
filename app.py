@@ -17,7 +17,7 @@ class TokenRequest(BaseModel):
     roomName: str
     participantName: str
     userId: str = None
-    nylasGrantId: str = None
+    grantId: str = None  # Changed from nylasGrantId to grantId
 
 @app.post("/token")
 async def create_token(request: TokenRequest):
@@ -42,10 +42,10 @@ async def create_token(request: TokenRequest):
         ))
         
         # Add user metadata and dispatch voice-assistant agent
-        if request.userId or request.nylasGrantId:
+        if request.userId or request.grantId:
             # Add metadata to participant
             token.with_metadata(
-                f'{{"userId": "{request.userId or ""}", "nylasGrantId": "{request.nylasGrantId or ""}"}}'
+                f'{{"userId": "{request.userId or ""}", "grantId": "{request.grantId or ""}"}}'  # Changed field name
             )
             
             # Dispatch the voice-assistant agent with metadata
@@ -54,7 +54,7 @@ async def create_token(request: TokenRequest):
                     agents=[
                         api.RoomAgentDispatch(
                             agent_name="voice-assistant",
-                            metadata=f'{{"userId": "{request.userId or ""}", "nylasGrantId": "{request.nylasGrantId or ""}"}}'
+                            metadata=f'{{"userId": "{request.userId or ""}", "grantId": "{request.grantId or ""}"}}'  # Changed field name
                         )
                     ],
                 )
