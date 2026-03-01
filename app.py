@@ -41,23 +41,30 @@ async def create_token(request: TokenRequest):
         if request.userId:
             email_grant = request.emailGrantId or ""
             calendar_grant = request.calendarGrantId or ""
-            
-            metadata_json = f'{{"userId": "{request.userId}", "emailGrantId": "{email_grant}", "calendarGrantId": "{calendar_grant}"}}'
-            
+
+            # Use snake_case keys — matches what praxa_agent.py reads
+            import json as _json
+            metadata_dict = {
+                "user_id": request.userId,
+                "email_grant_id": email_grant,
+                "calendar_grant_id": calendar_grant,
+            }
+            metadata_json = _json.dumps(metadata_dict)
+
             token.with_metadata(metadata_json)
-            
+
             token.with_room_config(
                 api.RoomConfiguration(
                     agents=[
                         api.RoomAgentDispatch(
                             agent_name="voice-assistant",
-                            metadata=metadata_json
+                            metadata=metadata_json,
                         )
                     ],
                 )
             )
-            
-            print(f"[Token Server] Dispatching agent for userId: {request.userId}, emailGrant: {email_grant[:20] if email_grant else 'none'}, calendarGrant: {calendar_grant[:20] if calendar_grant else 'none'}")
+
+            print(f"[Token Server] Dispatching agent for user_id: {request.userId}, email_grant: {email_grant[:20] if email_grant else 'none'}, calendar_grant: {calendar_grant[:20] if calendar_grant else 'none'}")
         else:
             print("[Token Server] Warning: No userId provided")
         
