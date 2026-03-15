@@ -20,6 +20,7 @@ class TokenRequest(BaseModel):
     userId: Optional[str] = None
     emailGrantId: Optional[str] = None
     calendarGrantId: Optional[str] = None
+    timezone: Optional[str] = None
 
 @app.post("/token")
 async def create_token(request: TokenRequest):
@@ -48,6 +49,7 @@ async def create_token(request: TokenRequest):
                 "user_id": request.userId,
                 "email_grant_id": email_grant,
                 "calendar_grant_id": calendar_grant,
+                "timezone": request.timezone or "UTC",
             }
             metadata_json = _json.dumps(metadata_dict)
 
