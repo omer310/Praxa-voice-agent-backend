@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from livekit import api
 import os
-from typing import Optional
+from typing import List, Optional
 
 app = FastAPI()
 
@@ -21,6 +21,7 @@ class TokenRequest(BaseModel):
     emailGrantId: Optional[str] = None
     calendarGrantId: Optional[str] = None
     timezone: Optional[str] = None
+    initiativeNames: Optional[List[str]] = None
 
 @app.post("/token")
 async def create_token(request: TokenRequest):
@@ -51,6 +52,8 @@ async def create_token(request: TokenRequest):
                 "calendar_grant_id": calendar_grant,
                 "timezone": request.timezone or "UTC",
             }
+            if request.initiativeNames:
+                metadata_dict["initiative_names"] = request.initiativeNames
             metadata_json = _json.dumps(metadata_dict)
 
             token.with_metadata(metadata_json)
