@@ -1,5 +1,9 @@
 fastapi
 uvicorn[standard]
-livekit-api>=1.1.0
-pydantic
+openai>=1.80.0
+httpx
 python-dotenv
+python-dateutil
+supabase
+pydantic
+websockets
