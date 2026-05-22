@@ -22,6 +22,7 @@ class TokenRequest(BaseModel):
     calendarGrantId: Optional[str] = None
     timezone: Optional[str] = None
     initiativeNames: Optional[List[str]] = None
+    sessionId: Optional[str] = None
 
 @app.post("/token")
 async def create_token(request: TokenRequest):
@@ -54,6 +55,8 @@ async def create_token(request: TokenRequest):
             }
             if request.initiativeNames:
                 metadata_dict["initiative_names"] = request.initiativeNames
+            if request.sessionId:
+                metadata_dict["session_id"] = request.sessionId
             metadata_json = _json.dumps(metadata_dict)
 
             token.with_metadata(metadata_json)
