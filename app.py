@@ -156,23 +156,52 @@ async def get_voices():
     if _voices_cache is not None:
         return _voices_cache
 
-    voices = []
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        for voice_id, meta in _VOICE_META.items():
-            preview_url = None
-            if ELEVENLABS_API_KEY:
+    preview_by_id: dict[str, str] = {}
+    if not ELEVENLABS_API_KEY:
+        print("[/voices] ELEVENLABS_API_KEY not set — previews unavailable")
+    else:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # One bulk call is cheaper and more reliable than per-voice lookups.
+            try:
+                resp = await client.get(
+                    "https://api.elevenlabs.io/v1/voices",
+                    headers={"xi-api-key": ELEVENLABS_API_KEY},
+                )
+                if resp.status_code == 200:
+                    for v in resp.json().get("voices", []):
+                        vid = v.get("voice_id")
+                        if vid and v.get("preview_url"):
+                            preview_by_id[vid] = v["preview_url"]
+                else:
+                    print(f"[/voices] bulk list returned {resp.status_code}")
+            except Exception as e:
+                print(f"[/voices] bulk fetch failed: {e}")
+
+            # Fill any gaps (e.g. premade voices not in the account's list) individually.
+            for voice_id in _VOICE_META:
+                if voice_id in preview_by_id:
+                    continue
                 try:
-                    resp = await client.get(
+                    r = await client.get(
                         f"https://api.elevenlabs.io/v1/voices/{voice_id}",
                         headers={"xi-api-key": ELEVENLABS_API_KEY},
                     )
-                    if resp.status_code == 200:
-                        preview_url = resp.json().get("preview_url")
-                except Exception:
-                    pass
-            voices.append({"id": voice_id, **meta, "previewUrl": preview_url})
+                    if r.status_code == 200:
+                        url = r.json().get("preview_url")
+                        if url:
+                            preview_by_id[voice_id] = url
+                except Exception as e:
+                    print(f"[/voices] preview fetch failed for {voice_id}: {e}")
 
-    _voices_cache = voices
+    voices = [
+        {"id": voice_id, **meta, "previewUrl": preview_by_id.get(voice_id)}
+        for voice_id, meta in _VOICE_META.items()
+    ]
+
+    # Only cache once we actually have previews, so a missing key or transient
+    # error at boot doesn't permanently poison the response.
+    if preview_by_id:
+        _voices_cache = voices
     return voices
 
 
